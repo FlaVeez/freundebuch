@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mein Freundebuch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #FDF6EE; font-family: 'Lora', Georgia, serif; min-height: 100vh; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+    @keyframes fadein { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+    .page { min-height: 100vh; padding: 28px 20px; display: flex; flex-direction: column; align-items: center; }
+    .center { justify-content: center; }
+    h1 { font-family: 'Playfair Display', serif; font-size: clamp(26px,6vw,40px); font-weight: 900; color: #1A0A00; text-align: center; letter-spacing: -0.5px; }
+    h2 { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 900; color: #1A0A00; margin-bottom: 24px; }
+    label { font-weight: 500; color: #6B4C30; font-size: 14px; display: block; margin-bottom: 6px; }
+    input, textarea { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1.5px solid #E0C9A8; font-size: 15px; font-family: 'Lora', serif; background: #FFFBF5; color: #1A0A00; outline: none; }
+    textarea { resize: vertical; }
+    .btn-primary { background: #1A0A00; color: #FDF6EE; border: none; border-radius: 18px; padding: 16px 0; font-size: 17px; font-weight: 700; cursor: pointer; font-family: 'Playfair Display', serif; width: 100%; box-shadow: 0 6px 24px rgba(26,10,0,.25); letter-spacing: 0.3px; transition: transform .15s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-primary:disabled { opacity: 0.4; cursor: default; transform: none; }
+    .btn-ghost { background: transparent; color: #1A0A00; border: 1.5px solid #D4A97A; border-radius: 18px; padding: 15px 0; font-size: 16px; font-weight: 600; cursor: pointer; font-family: 'Lora', serif; width: 100%; }
+    .btn-back { background: none; border: none; color: #9C7B5E; font-size: 15px; cursor: pointer; font-family: 'Lora', serif; align-self: flex-start; margin-bottom: 24px; padding: 0; }
+    .btn-link { background: none; border: none; color: #B08060; font-size: 14px; cursor: pointer; font-family: 'Lora', serif; text-decoration: underline; margin-top: 4px; }
+    .field { margin-bottom: 22px; }
+    .card { border-radius: 24px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 24px rgba(0,0,0,.07); animation: fadein .4s ease; }
+    .blob1 { position: fixed; top: -100px; right: -100px; width: 350px; height: 350px; border-radius: 50%; background: radial-gradient(#FFD9B0, transparent 65%); pointer-events: none; z-index: 0; }
+    .blob2 { position: fixed; bottom: -80px; left: -80px; width: 280px; height: 280px; border-radius: 50%; background: radial-gradient(#C8E6D4, transparent 65%); pointer-events: none; z-index: 0; }
+    .content { position: relative; z-index: 1; width: 100%; }
+    .error { color: #C0392B; font-size: 14px; margin-bottom: 12px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+    .modal { background: #FDF6EE; border-radius: 28px; padding: 36px 32px; text-align: center; max-width: 340px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,.35); }
+    .url-box { background: #F5EDE0; border-radius: 12px; padding: 10px 14px; margin: 16px 0; font-size: 12px; color: #6B4C30; word-break: break-all; font-family: monospace; text-align: left; }
+    .photo-drop { border-radius: 16px; border: 2px dashed #D4A97A; min-height: 110px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; background: #FFFBF5; }
+    .photo-drop:hover { border-color: #A0724A; }
+    .photo-drop img { width: 100%; max-height: 220px; object-fit: cover; }
+    .audio-box { background: #FFFBF5; border-radius: 16px; border: 1.5px solid #E0C9A8; padding: 18px 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .rec-bar { width: 100%; height: 6px; background: #E0C9A8; border-radius: 3px; }
+    .rec-fill { height: 100%; background: #C0392B; border-radius: 3px; transition: width 1s linear; }
+    .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #C0392B; display: inline-block; animation: pulse 1s infinite; }
+    .avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .avatar-placeholder { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; color: #fff; }
+    .answer-label { font-size: 12px; font-weight: 700; color: #9C7B5E; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .answer-text { font-size: 15px; color: #2A1500; line-height: 1.7; font-style: italic; margin-bottom: 12px; }
+    .hidden { display: none; }
+    #screens > div { display: none; }
+    #screens > div.active { display: flex; }
+  </style>
+</head>
+<body>
+
+<!-- SCREENS -->
+<div id="screens">
+
+  <!-- HOME -->
+  <div id="screen-home" class="page center active">
+    <div class="blob1"></div>
+    <div class="blob2"></div>
+    <div class="content" style="max-width:380px;display:flex;flex-direction:column;align-items:center;">
+      <div style="font-size:72px;margin-bottom:8px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.12))">📖</div>
+      <h1 style="margin-bottom:8px;">Mein Freundebuch</h1>
+      <p style="color:#9C7B5E;font-size:16px;text-align:center;max-width:300px;line-height:1.8;margin-bottom:40px;font-style:italic;">
+        Hinterlasse eine Nachricht, ein Selfie &amp; eine Sprachnachricht. Für immer. 💛
+      </p>
+      <div style="display:flex;flex-direction:column;gap:14px;width:100%;">
+        <button class="btn-primary" onclick="showScreen('form')">✏️ Eintrag hinterlassen</button>
+        <button class="btn-ghost" onclick="showScreen('gallery');loadEntries()">🖼️ Alle Einträge lesen (<span id="entry-count">…</span>)</button>
+        <button class="btn-link" onclick="document.getElementById('qr-modal').style.display='flex'">🔗 Link &amp; QR-Code teilen</button>
+      </div>
+      <p id="home-error" class="error" style="margin-top:16px;text-align:center;"></p>
+    </div>
+  </div>
+
+  <!-- FORM -->
+  <div id="screen-form" class="page">
+    <div style="width:100%;max-width:500px;">
+      <button class="btn-back" onclick="resetForm()">← Zurück</button>
+      <div id="form-content">
+        <h2>✏️ Dein Eintrag</h2>
+
+        <div class="field">
+          <label>Dein Name *</label>
+          <input type="text" id="input-name" placeholder="z.B. Laura" />
+        </div>
+
+        <div class="field">
+          <label>📷 Selfie oder Foto (optional)</label>
+          <div class="photo-drop" onclick="document.getElementById('photo-input').click()">
+            <span id="photo-placeholder" style="color:#C4956A;font-size:15px;font-style:italic;">Tippe hier, um ein Foto hinzuzufügen</span>
+            <img id="photo-preview" class="hidden" alt="Vorschau" />
+          </div>
+          <input type="file" id="photo-input" accept="image/*" class="hidden" onchange="handlePhoto(this)" />
+        </div>
+
+        <div class="field">
+          <label>🎤 Sprachnachricht (max. 30 Sek.)</label>
+          <div class="audio-box" id="audio-box">
+            <button class="btn-primary" style="width:auto;padding:12px 30px;font-size:15px;" onclick="startRec()">🎙️ Aufnahme starten</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>🌟 Was schätzt du an unserer Freundschaft am meisten?</label>
+          <textarea id="q0" rows="2" placeholder="Deine Antwort…"></textarea>
+        </div>
+        <div class="field">
+          <label>💭 Was ist deine schönste Erinnerung mit mir?</label>
+          <textarea id="q1" rows="2" placeholder="Deine Antwort…"></textarea>
+        </div>
+        <div class="field">
+          <label>🗺️ Welches Abenteuer sollten wir noch zusammen erleben?</label>
+          <textarea id="q2" rows="2" placeholder="Deine Antwort…"></textarea>
+        </div>
+        <div class="field">
+          <label>🎁 Was würdest du mir schenken, wenn Geld keine Rolle spielt?</label>
+          <textarea id="q3" rows="2" placeholder="Deine Antwort…"></textarea>
+        </div>
+        <div class="field">
+          <label>💌 Was möchtest du mir sagen, was du noch nie gesagt hast?</label>
+          <textarea id="q4" rows="2" placeholder="Deine Antwort…"></textarea>
+        </div>
+
+        <p id="form-error" class="error"></p>
+        <button class="btn-primary" id="submit-btn" onclick="submitEntry()" style="margin-bottom:40px;">💾 Eintrag speichern</button>
+      </div>
+      <div id="form-success" class="hidden" style="text-align:center;padding-top:48px;">
+        <div style="font-size:80px;">🎉</div>
+        <h2 style="margin-top:16px;">Danke!</h2>
+        <p style="color:#9C7B5E;line-height:1.8;font-style:italic;margin-top:8px;">Dein Eintrag ist jetzt für immer hier. 💛</p>
+        <button class="btn-primary" style="width:auto;padding:14px 36px;margin-top:24px;" onclick="resetForm()">Zur Startseite</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GALLERY -->
+  <div id="screen-gallery" class="page">
+    <div style="width:100%;max-width:580px;">
+      <button class="btn-back" onclick="showScreen('home')">← Zurück</button>
+      <h2>🖼️ Alle Einträge</h2>
+      <div id="gallery-content">
+        <p style="color:#9C7B5E;text-align:center;font-style:italic;">Lädt…</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- QR MODAL -->
+<div id="qr-modal" class="modal-overlay hidden" onclick="this.style.display='none'" style="display:none;">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 style="font-family:'Playfair Display',serif;color:#1A0A00;margin-bottom:6px;">Freundebuch teilen</h3>
+    <p style="color:#9C7B5E;font-size:13px;margin:0 0 20px;line-height:1.7;">QR-Code scannen oder Link kopieren!</p>
+    <div style="background:#fff;padding:16px;border-radius:16px;display:inline-block;">
+      <img id="qr-img" alt="QR Code" style="width:180px;height:180px;display:block;" />
+    </div>
+    <div class="url-box" id="url-display"></div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn-ghost" style="width:auto;padding:10px 20px;font-size:14px;" onclick="copyUrl()">📋 Kopieren</button>
+      <button class="btn-primary" style="width:auto;padding:10px 20px;font-size:14px;" onclick="document.getElementById('qr-modal').style.display='none'">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Supabase ──────────────────────────────────────────────────────────────
+  const { createClient } = supabase;
+  const db = createClient(
+    'https://ijcudmweioyetpttzzne.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqY3VkbXdlaW95ZXRwdHR6em5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NjU3NDAsImV4cCI6MjA5MDE0MTc0MH0.Rzn8DZ3fQT3iXGjz0Pjb9QeQV-e0A1qilKPqqPbC1Wc'
+  );
+
+  const PALETTE = [
+    { color_bg: '#FFF0E6', color_accent: '#D4622A' },
+    { color_bg: '#E8F4F0', color_accent: '#2A7A5B' },
+    { color_bg: '#EEF0FA', color_accent: '#3A4AB5' },
+    { color_bg: '#F9EEF5', color_accent: '#8A2A7A' },
+    { color_bg: '#FDFAE6', color_accent: '#8A7200' },
+    { color_bg: '#F0F6FF', color_accent: '#1A5FAD' },
+  ];
+
+  const QUESTIONS = [
+    '🌟 Was schätzt du an unserer Freundschaft am meisten?',
+    '💭 Was ist deine schönste Erinnerung mit mir?',
+    '🗺️ Welches Abenteuer sollten wir noch zusammen erleben?',
+    '🎁 Was würdest du mir schenken, wenn Geld keine Rolle spielt?',
+    '💌 Was möchtest du mir sagen, was du noch nie gesagt hast?',
+  ];
+
+  let photoData = null;
+  let audioData = null;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let recTimer = null;
+  let recSeconds = 0;
+
+  // ── QR setup ─────────────────────────────────────────────────────────────
+  const appUrl = window.location.origin + window.location.pathname;
+  document.getElementById('qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=1A0A00&bgcolor=ffffff&data=${encodeURIComponent(appUrl)}`;
+  document.getElementById('url-display').textContent = appUrl;
+
+  function copyUrl() {
+    navigator.clipboard && navigator.clipboard.writeText(appUrl);
+    alert('Link kopiert!');
+  }
+
+  // ── Screen navigation ─────────────────────────────────────────────────────
+  function showScreen(name) {
+    document.querySelectorAll('#screens > div').forEach(d => d.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+  }
+
+  // ── Load entries ──────────────────────────────────────────────────────────
+  async function loadEntries() {
+    const { data, error } = await db.from('entries').select('*').order('created_at', { ascending: false });
+    if (error) {
+      document.getElementById('gallery-content').innerHTML = `<p class="error">Fehler: ${error.message}</p>`;
+      document.getElementById('home-error').textContent = 'DB Fehler: ' + error.message;
+      return;
+    }
+    document.getElementById('entry-count').textContent = data.length;
+    if (data.length === 0) {
+      document.getElementById('gallery-content').innerHTML = '<div style="text-align:center;padding-top:48px;color:#C4956A;"><div style="font-size:56px;">🌸</div><p style="font-style:italic;margin-top:12px;">Noch keine Einträge.<br/>Schick den Link an deine Freunde!</p></div>';
+      return;
+    }
+    document.getElementById('gallery-content').innerHTML = data.map(e => `
+      <div class="card" style="background:${e.color_bg};border-left:5px solid ${e.color_accent};">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+          ${e.photo
+            ? `<img src="${e.photo}" class="avatar" style="border:3px solid ${e.color_accent};" />`
+            : `<div class="avatar-placeholder" style="background:${e.color_accent};">😊</div>`
+          }
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-weight:900;font-size:21px;color:#1A0A00;">${e.name}</div>
+            <div style="font-size:12px;color:#9C7B5E;margin-top:2px;">${e.created_at ? new Date(e.created_at).toLocaleDateString('de-DE') : ''}</div>
+          </div>
+        </div>
+        ${e.audio ? `
+          <div style="margin-bottom:16px;">
+            <div class="answer-label">🎤 Sprachnachricht</div>
+            <audio controls src="${e.audio}" style="width:100%;border-radius:10px;margin-top:4px;"></audio>
+          </div>` : ''}
+        ${Array.isArray(e.answers) ? e.answers.map((a, i) => a ? `
+          <div>
+            <div class="answer-label">${QUESTIONS[i]}</div>
+            <div class="answer-text">„${a}"</div>
+          </div>` : '').join('') : ''}
+      </div>
+    `).join('');
+  }
+
+  // ── Photo ─────────────────────────────────────────────────────────────────
+  function handlePhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const max = 800;
+      let { width, height } = img;
+      if (width > max) { height = height * max / width; width = max; }
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      photoData = canvas.toDataURL('image/jpeg', 0.75);
+      document.getElementById('photo-placeholder').classList.add('hidden');
+      const prev = document.getElementById('photo-preview');
+      prev.src = photoData;
+      prev.classList.remove('hidden');
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+
+  // ── Audio ─────────────────────────────────────────────────────────────────
+  async function startRec() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onload = ev => {
+          audioData = ev.target.result;
+          document.getElementById('audio-box').innerHTML = `
+            <audio controls src="${audioData}" style="width:100%;border-radius:10px;"></audio>
+            <button onclick="deleteAudio()" style="background:none;border:none;color:#C4956A;cursor:pointer;font-size:13px;font-family:'Lora',serif;">✕ Aufnahme löschen</button>
+          `;
+        };
+        reader.readAsDataURL(blob);
+      };
+      mediaRecorder.start();
+      recSeconds = 0;
+      document.getElementById('audio-box').innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;color:#C0392B;font-weight:700;font-size:16px;">
+          <span class="rec-dot"></span> Aufnahme… <span id="rec-time">0</span>s / 30s
+        </div>
+        <div class="rec-bar"><div class="rec-fill" id="rec-fill" style="width:0%"></div></div>
+        <button onclick="stopRec()" style="background:#C0392B;color:#fff;border:none;border-radius:12px;padding:10px 28px;font-size:15px;cursor:pointer;font-family:'Lora',serif;">⏹ Stoppen</button>
+      `;
+      recTimer = setInterval(() => {
+        recSeconds++;
+        const el = document.getElementById('rec-time');
+        const fill = document.getElementById('rec-fill');
+        if (el) el.textContent = recSeconds;
+        if (fill) fill.style.width = (recSeconds / 30 * 100) + '%';
+        if (recSeconds >= 30) stopRec();
+      }, 1000);
+    } catch (e) {
+      document.getElementById('form-error').textContent = 'Mikrofon-Zugriff verweigert.';
+    }
+  }
+
+  function stopRec() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+    clearInterval(recTimer);
+  }
+
+  function deleteAudio() {
+    audioData = null;
+    document.getElementById('audio-box').innerHTML = `<button class="btn-primary" style="width:auto;padding:12px 30px;font-size:15px;" onclick="startRec()">🎙️ Aufnahme starten</button>`;
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+  async function submitEntry() {
+    const name = document.getElementById('input-name').value.trim();
+    if (!name) { document.getElementById('form-error').textContent = 'Bitte gib deinen Namen ein.'; return; }
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Wird gespeichert…';
+    document.getElementById('form-error').textContent = '';
+    const pal = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+    const answers = [0,1,2,3,4].map(i => document.getElementById('q' + i).value);
+    const { error } = await db.from('entries').insert([{
+      name,
+      answers,
+      photo: photoData,
+      audio: audioData,
+      color_bg: pal.color_bg,
+      color_accent: pal.color_accent,
+    }]);
+    btn.disabled = false;
+    btn.textContent = '💾 Eintrag speichern';
+    if (error) {
+      document.getElementById('form-error').textContent = 'Fehler: ' + error.message;
+      return;
+    }
+    document.getElementById('form-content').classList.add('hidden');
+    document.getElementById('form-success').classList.remove('hidden');
+    loadEntries();
+  }
+
+  // ── Reset ─────────────────────────────────────────────────────────────────
+  function resetForm() {
+    document.getElementById('input-name').value = '';
+    [0,1,2,3,4].forEach(i => document.getElementById('q' + i).value = '');
+    photoData = null;
+    audioData = null;
+    document.getElementById('photo-placeholder').classList.remove('hidden');
+    document.getElementById('photo-preview').classList.add('hidden');
+    document.getElementById('photo-preview').src = '';
+    document.getElementById('audio-box').innerHTML = `<button class="btn-primary" style="width:auto;padding:12px 30px;font-size:15px;" onclick="startRec()">🎙️ Aufnahme starten</button>`;
+    document.getElementById('form-content').classList.remove('hidden');
+    document.getElementById('form-success').classList.add('hidden');
+    document.getElementById('form-error').textContent = '';
+    showScreen('home');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  loadEntries();
+</script>
+</body>
+</html>
